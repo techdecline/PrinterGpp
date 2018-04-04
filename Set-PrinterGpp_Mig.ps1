@@ -1,8 +1,8 @@
 ﻿param (
-    [String]$GpoName = "ftl_gpo_printer_user_test",
+    [String]$GpoName = "drucker",
     [String]$Scope = "User",
-    [String]$PrinterObjList = "C:\Users\a1mpaschke\AppData\Local\Temp\FTL\printerList.csv",
-    [String]$DomainName = "bghde.bgh.intra"
+    [String]$PrinterObjList = "E:\Scripts\PrinterGpp\PrinterList.csv",
+    [String]$DomainName = "decline.lab"
 )
 
 function New-GPPPrinterObject {
@@ -52,6 +52,27 @@ function New-GPPPrinterObject {
     return $printerObj
 }
 
+Function Resolve-FilterGroup {
+    param (
+        [String]$ShareName,
+        [String]$Prefix = "ftl_grp_printer_"
+    )
+
+    $groupName = $Prefix + $ShareName
+    try {
+        Get-ADGroup -Identity $groupName -ErrorAction Stop -OutVariable grpObj
+        $returnObj = $grpObj | Select-Object `
+            @{"Name" = "GroupName";Expression = {(Get-ADDomain ).NetBIOSName + "\" + $_.Name}},
+            @{"Name" = "SIDString";Expression = {$_.SID -as [String]}}
+    }
+    catch [System.Management.Automation.ActionPreferenceStopException] {
+        Write-Warning "No such group $groupName"
+        return $false
+    }
+
+    return $returnObj
+}
+
 function Initialize-PrinterGppFile {
     param (
         [string]$XmlPath
@@ -60,7 +81,9 @@ function Initialize-PrinterGppFile {
         $content = @'
 <?xml version="1.0" encoding="utf-8"?>
 <Printers clsid="{1F577D12-3D1B-471e-A1B7-060317597B9C}">
-<SharedPrinter clsid="{9A5E9697-9095-436d-A0EE-4D128FDFBCE5}" name="dummyprinter" status="dummyprinter" image="2" changed="2018-03-27 13:48:31" uid="{A7F1336F-067D-43E0-83C1-85685220A79A}" bypassErrors="1"><Properties action="U" comment="" path="\\dummyserver\dummyprinter" location="" default="0" skipLocal="0" deleteAll="0" persistent="0" deleteMaps="0" port=""/></SharedPrinter>
+<SharedPrinter clsid="{9A5E9697-9095-436d-A0EE-4D128FDFBCE5}" name="dummyprinter" status="dummyprinter" image="2" changed="2018-03-27 13:48:31" uid="{A7F1336F-067D-43E0-83C1-85685220A79A}" bypassErrors="1"><Properties action="U" comment="" path="\\dummyserver\dummyprinter" location="" default="0" skipLocal="0" deleteAll="0" persistent="0" deleteMaps="0" port=""/>
+<Filters><FilterGroup bool="AND" not="0" name="DECLINE\ftl_grp_printer_TestPrinter204" sid="S-1-5-21-3014742100-1987343316-1888600620-3611" userContext="1" primaryGroup="0" localGroup="0"/></Filters>
+</SharedPrinter>
 </Printers>
 '@
 
@@ -117,9 +140,12 @@ $printerObjArr = Import-Csv $PrinterObjList
 
 # Generate new printers
 foreach ($printer in $printerObjArr) {
+    #$filterGroup = Resolve-FilterGroup -ShareName $printer.Name
+
     $printerGppObj = New-GPPPrinterObject -SharedPrinterPath $printer.PrinterUncPath -Action $printer.Action
 
     $newNode = $dummyNode.Clone()
+    $filterNode = $new.Filters
     $newNode.clsid = $printerGppObj.clsid
     $newNode.name = $printerGppObj.name
     $newNode.status = $printerGppObj.status
@@ -137,6 +163,19 @@ foreach ($printer in $printerObjArr) {
     $newNode.Properties.persistent = $printerGppObj.persistent
     $newNode.Properties.deleteMaps = $printerGppObj.deleteMaps
     $newNode.Properties.port = $printerGppObj.port
+    if ($newNode.Properties.action -eq "D") {
+        $newNode.Filters.RemoveAll()
+    }
+    else {
+        if ($grpObj = Resolve-FilterGroup -ShareName $printerGppObj.Name) {
+            $grpObj
+            $newNode.Filters.FilterGroup.name = $grpObj.GroupName.ToString()
+            $newNode.Filters.FilterGroup.sid = [String]$grpObj.SidString
+        }
+    }
+
+
+
     $xmlObj.Printers.AppendChild($newNode)
 }
 
