@@ -1,8 +1,14 @@
-﻿# Create Migration List
- $newServer = "\\CM-Win10-3"
- $oldServer = "\\CM-Win10-1"
+﻿param (
+    # Create Migration List
+    $newServer = "\\sftlpnt01",
+    $oldServer = "\\sftlfs01",
+    $printerListFile = "C:\Users\a1mpaschke\AppData\Local\Temp\printerlist.txt",
+    $siteCode = "FTL"
+)
 
- $nameArr = 200..210 | ForEach-Object {"TestPrinter$_"}
+ # $nameArr = 200..210 | ForEach-Object {"TestPrinter$_"}
+ $nameArr = Get-Content $printerListFile
+ $scratchDir = join-path $env:TEMP -ChildPath $siteCode
  $printerColl = @()
 
  foreach ($printer in $nameArr) {
@@ -11,4 +17,4 @@
 
  }
 
- $printerColl | Export-Csv -Path .\PrinterList.csv -Force -Delimiter "," -NoTypeInformation
+ $printerColl | Export-Csv -Path (Join-Path $scratchDir -ChildPath printerList.csv) -Force -Delimiter "," -NoTypeInformation

@@ -1,7 +1,8 @@
 ﻿param (
-    [String]$GpoName = "Drucker",
+    [String]$GpoName = "ftl_gpo_printer_user_test",
     [String]$Scope = "User",
-    [String[]]$PrinterObjList = "E:\Scripts\PrinterGpp\PrinterList.csv"
+    [String]$PrinterObjList = "C:\Users\a1mpaschke\AppData\Local\Temp\FTL\printerList.csv",
+    [String]$DomainName = "bghde.bgh.intra"
 )
 
 function New-GPPPrinterObject {
@@ -12,8 +13,14 @@ function New-GPPPrinterObject {
 
     switch ($action)
     {
-        'Update' { $actionPrefix = "U"}
-        'Delete' { $actionPrefix = "D"}
+        'Update' {
+            $actionPrefix = "U"
+            $imageNo = "2"
+        }
+        'Delete' {
+            $actionPrefix = "D"
+            $imageNo = "3"
+        }
         Default {}
     }
 
@@ -21,12 +28,12 @@ function New-GPPPrinterObject {
     Add-Member -InputObject $printerObj -MemberType NoteProperty -Name clsid -Value "{9A5E9697-9095-436d-A0EE-4D128FDFBCE5}"
     Add-Member -InputObject $printerObj -MemberType NoteProperty -Name name -Value $SharedPrinterPath.Split("\")[-1]
     Add-Member -InputObject $printerObj -MemberType NoteProperty -Name status -Value $SharedPrinterPath.Split("\")[-1]
-    Add-Member -InputObject $printerObj -MemberType NoteProperty -Name image -Value "2"
+    Add-Member -InputObject $printerObj -MemberType NoteProperty -Name image -Value $imageNo.ToString()
     Add-Member -InputObject $printerObj -MemberType NoteProperty -Name changed -Value (get-date).GetDateTimeFormats()[31]
     Add-Member -InputObject $printerObj -MemberType NoteProperty -Name uid -Value ("{$((New-Guid).guid)}")
     Add-Member -InputObject $printerObj -MemberType NoteProperty -Name bypassErrors -Value "1".ToString()
 
-    
+
     $propertiesDictionary = [ordered]@{
         action="$actionPrefix";
         comment="";
@@ -40,7 +47,7 @@ function New-GPPPrinterObject {
         port="0";
 
     }
-    
+
     Add-Member -InputObject $printerObj -NotePropertyMembers $propertiesDictionary -TypeName printerObj
     return $printerObj
 }
@@ -70,7 +77,7 @@ catch [System.Management.Automation.ActionPreferenceStopException] {
 }
 
 try {
-    $gpObj = Get-GPO -Name $GpoName -ErrorAction Stop
+    $gpObj = Get-GPO -Name $GpoName -ErrorAction Stop -Domain $DomainName
     $gpPath = "\\$($gpObj.DomainName)\sysvol\$($gpObj.DomainName)\Policies\{$($gpObj.id)}"
 }
 catch [System.ArgumentException] {
