@@ -81,7 +81,8 @@ function Initialize-PrinterGppFile {
         $content = @'
 <?xml version="1.0" encoding="utf-8"?>
 <Printers clsid="{1F577D12-3D1B-471e-A1B7-060317597B9C}">
-<SharedPrinter clsid="{9A5E9697-9095-436d-A0EE-4D128FDFBCE5}" name="dummyprinter" status="dummyprinter" image="2" changed="2018-03-27 13:48:31" uid="{A7F1336F-067D-43E0-83C1-85685220A79A}" bypassErrors="1"><Properties action="U" comment="" path="\\dummyserver\dummyprinter" location="" default="0" skipLocal="0" deleteAll="0" persistent="0" deleteMaps="0" port=""/>
+<SharedPrinter clsid="{9A5E9697-9095-436d-A0EE-4D128FDFBCE5}" name="dummyprinter" status="dummyprinter" image="2" changed="2018-03-27 13:48:31" uid="{A7F1336F-067D-43E0-83C1-85685220A79A}" bypassErrors="1">
+<Properties action="U" comment="" path="\\dummyserver\dummyprinter" location="" default="0" skipLocal="0" deleteAll="0" persistent="0" deleteMaps="0" port=""/>
 <Filters><FilterGroup bool="AND" not="0" name="DECLINE\ftl_grp_printer_TestPrinter204" sid="S-1-5-21-3014742100-1987343316-1888600620-3611" userContext="1" primaryGroup="0" localGroup="0"/></Filters>
 </SharedPrinter>
 </Printers>
@@ -164,7 +165,7 @@ foreach ($printer in $printerObjArr) {
     $newNode.Properties.deleteMaps = $printerGppObj.deleteMaps
     $newNode.Properties.port = $printerGppObj.port
     if ($newNode.Properties.action -eq "D") {
-        $newNode.Filters.RemoveAll()
+        $newNode.RemoveChild($newNode.Filters)
     }
     else {
         if ($grpObj = Resolve-FilterGroup -ShareName $printerGppObj.Name) {
@@ -182,4 +183,12 @@ foreach ($printer in $printerObjArr) {
 $xmlObj.Printers.RemoveChild($dummyNode)
 
 # Save XML
-$xmlObj.Save($printersXmlPath)
+# $xmlObj.Save($printersXmlPath)
+
+# Save without Indentation and newline
+$xwSettings = New-Object -TypeName System.Xml.XmlWriterSettings
+$xwSettings.Indent = $false
+$xwSettings.NewLineChars = $null
+$xWriter = [System.Xml.XmlWriter]::Create($printersXmlPath,$xwSettings)
+$xmlObj.Save($xWriter)
+$xWriter.Close()
